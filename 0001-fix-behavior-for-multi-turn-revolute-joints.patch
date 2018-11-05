@@ -1,0 +1,55 @@
+From cd849483408795922d2cb4383fde0e78ed763ff8 Mon Sep 17 00:00:00 2001
+From: Morgan Quigley <morgan@osrfoundation.org>
+Date: Thu, 6 Apr 2017 15:37:47 -0700
+Subject: [PATCH] fix behavior for multi-turn revolute joints
+
+Previously, the behavior of revolute joints was unexpected when
+the joint limits extended beyond [-pi, pi] due to unwrapping
+happening in a few places in the angles package, which was called
+from the joint position controller. This PR checks to see if the
+range of motion extends beyond [-pi, pi] and, if so, goes directly
+to the (clamped) target, rather than trying to unwrap the current
+or target angles to find the shortest path.
+---
+ .../src/joint_position_controller.cpp         | 25 ++++++++++++++-----
+ 1 file changed, 19 insertions(+), 6 deletions(-)
+
+diff --git a/effort_controllers/src/joint_position_controller.cpp b/effort_controllers/src/joint_position_controller.cpp
+index a9f4be5..3d4b251 100644
+--- a/effort_controllers/src/joint_position_controller.cpp
++++ b/effort_controllers/src/joint_position_controller.cpp
+@@ -181,12 +181,25 @@ void JointPositionController::update(const ros::Time& time, const ros::Duration&
+   // Compute position error
+   if (joint_urdf_->type == urdf::Joint::REVOLUTE)
+   {
+-   angles::shortest_angular_distance_with_limits(
+-      current_position,
+-      command_position,
+-      joint_urdf_->limits->lower,
+-      joint_urdf_->limits->upper,
+-      error);
++    if (joint_urdf_->limits->lower >= -M_PI &&
++        joint_urdf_->limits->upper <=  M_PI) {
++      // this path only works when the joint travel is
++      // within [-pi,pi]
++      angles::shortest_angular_distance_with_limits(
++        current_position,
++        command_position,
++        joint_urdf_->limits->lower,
++        joint_urdf_->limits->upper,
++        error);
++    } else {
++      // apply limits and compute error without trying to unwrap
++      double clamped_command = command_position;
++      if (clamped_command > joint_urdf_->limits->upper)
++        clamped_command = joint_urdf_->limits->upper;
++      else if (clamped_command < joint_urdf_->limits->lower)
++        clamped_command = joint_urdf_->limits->lower;
++      error = clamped_command - current_position;
++    }
+   }
+   else if (joint_urdf_->type == urdf::Joint::CONTINUOUS)
+   {
+-- 
+2.17.1
+
