@@ -61,11 +61,16 @@ if (CATKIN_ENABLE_TESTING)
     std_msgs
     std_srvs
     gazebo_ros
+    gazebo_dev
     xacro
   )
   include_directories(${catkin_INCLUDE_DIRS})
+  
+# bug in gazebo dependencies
+# See https://bitbucket.org/ignitionrobotics/ign-cmake/issues/40
+ign_import_target(UUID)
 
-  add_executable(${PROJECT_NAME}_ackermann_steering_bot test/common/src/ackermann_steering_bot.cpp)
+add_executable(${PROJECT_NAME}_ackermann_steering_bot test/common/src/ackermann_steering_bot.cpp)
   add_dependencies(tests ${PROJECT_NAME}_ackermann_steering_bot)
 
   target_link_libraries(${PROJECT_NAME}_ackermann_steering_bot ${catkin_LIBRARIES})
